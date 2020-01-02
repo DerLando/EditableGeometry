@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Forms;
 using EditableGeometry.Core;
 using GH_IO.Serialization;
 using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
+using Grasshopper.Kernel.Types;
 using Rhino;
 using Rhino.Geometry;
 
@@ -11,7 +14,7 @@ namespace EditableGeometry.Components
 {
     public class Edit : GH_Component
     {
-        private Geometry Geometry;
+        private Geometry[] Geometry = new Geometry[0];
         private bool _edit_mode = false;
 
         public bool EditMode
@@ -40,7 +43,7 @@ namespace EditableGeometry.Components
         /// </summary>
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
-            pManager.AddGeometryParameter("Geometry", "G", "Geometry to edit", GH_ParamAccess.item);
+            pManager.AddGeometryParameter("Geometry", "G", "Geometry to edit", GH_ParamAccess.tree);
             pManager.AddBooleanParameter("Flush", "F", "Removes all edits", GH_ParamAccess.item);
         }
 
@@ -49,7 +52,7 @@ namespace EditableGeometry.Components
         /// </summary>
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
-            pManager.AddGeometryParameter("Geometry", "G", "Edited Geometry", GH_ParamAccess.item);
+            pManager.AddGeometryParameter("Geometry", "G", "Edited Geometry", GH_ParamAccess.list);
         }
 
         /// <summary>
@@ -58,32 +61,48 @@ namespace EditableGeometry.Components
         /// <param name="DA">The DA object is used to retrieve from inputs and store in outputs.</param>
         protected override void SolveInstance(IGH_DataAccess DA)
         {
-            GeometryBase geo = null;
+            GH_Structure<IGH_GeometricGoo> geo;
             bool flush = false;
 
-            if (!DA.GetData(0, ref geo)) return;
-            if(Geometry == null) Geometry = new Geometry(geo);
+            if (!DA.GetDataTree(0, out geo)) return;
+            if (Geometry.Length == 0)
+            {
+                var data = geo.AllData(true).ToArray();
+                Geometry = new Geometry[data.Length];
+                for (int i = 0; i < Geometry.Length; i++)
+                {
+                    data[i].CastTo(out GeometryBase gBase);
+                    Geometry[i] = new Geometry(gBase);
+                }
+                //Geometry = (from g in geo.AllData(true) select new Geometry(g.CastTo(out ))).ToArray();
+            }
 
             if (!DA.GetData(1, ref flush)) return;
             if (flush)
             {
                 // Flush edit cache
-                Geometry = null;
+                Geometry = new Geometry[0];
                 return;
             }
 
             if (EditMode)
             {
-                Geometry.MakeEditable(RhinoDoc.ActiveDoc);
+                for (int i = 0; i < Geometry.Length; i++)
+                {
+                    Geometry[i].MakeEditable(RhinoDoc.ActiveDoc);
+                }
             }
 
             else
             {
-                Geometry.EndEdit(RhinoDoc.ActiveDoc);
+                for (int i = 0; i < Geometry.Length; i++)
+                {
+                    Geometry[i].EndEdit(RhinoDoc.ActiveDoc);
+                }
             }
 
 
-            DA.SetData(0, Geometry.GetGeometry());
+            DA.SetDataList(0, from g in Geometry select g.GetGeometry());
 
         }
 
@@ -103,17 +122,30 @@ namespace EditableGeometry.Components
         public override bool Write(GH_IWriter writer)
         {
             writer.SetBoolean("EditMode", EditMode);
-            var bytes = GH_Convert.CommonObjectToByteArray(Geometry.GetGeometry());
 
             // When closing rhino this is null :/
-            if(bytes != null) writer.SetByteArray("Geometry", bytes);
+            if (Geometry.Length != 0)
+            {
+                writer.SetInt32("GeoCount", Geometry.Length);
+                for (int i = 0; i < Geometry.Length; i++)
+                {
+                    var bytes = GH_Convert.CommonObjectToByteArray(Geometry[i].GetGeometry());
+                    if (bytes != null) writer.SetByteArray($"Geometry{i}", bytes);
+                }
+            }
             return base.Write(writer);
         }
 
         public override bool Read(GH_IReader reader)
         {
             EditMode = reader.GetBoolean("EditMode");
-            Geometry = new Geometry(GH_Convert.ByteArrayToCommonObject<GeometryBase>(reader.GetByteArray("Geometry")));
+            var count = reader.GetInt32("GeoCount");
+            Geometry = new Geometry[count];
+            for (int i = 0; i < count; i++)
+            {
+                Geometry[i] =
+                    new Geometry(GH_Convert.ByteArrayToCommonObject<GeometryBase>(reader.GetByteArray($"Geometry{i}")));
+            }
             return base.Read(reader);
         }
 
