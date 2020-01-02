@@ -6,6 +6,13 @@ namespace EditableGeometry
 {
     public class EditableGeometryInfo : GH_AssemblyInfo
     {
+
+        #region Settings
+
+        public static string MAIN_CATEGORY = "Editable";
+        public static string SUBCATEGORY_EDIT = "Edit";
+
+        #endregion
         public override string Name
         {
             get

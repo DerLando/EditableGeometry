@@ -56,7 +56,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="EditableGeometryComponent.cs" />
+    <Compile Include="Components\Edit.cs" />
+    <Compile Include="Core\Geometry.cs" />
     <Compile Include="EditableGeometryInfo.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
