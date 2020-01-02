@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
 using Grasshopper.Kernel.Geometry.Voronoi;
@@ -14,12 +16,15 @@ namespace EditableGeometry.Core
     {
         public Guid Guid { get; set; } = Guid.Empty;
         public GeometryBase GeometryBase { get; set; }
-        public ObjectType ObjectType { get; set; }
-        public HistoryRecord HistoryRecord { get; set; }
 
         public Geometry(GeometryBase geometryBase)
         {
             GeometryBase = geometryBase;
+        }
+
+        public Geometry(byte[] bytes)
+        {
+
         }
 
         public void MakeEditable(RhinoDoc doc)
@@ -48,6 +53,17 @@ namespace EditableGeometry.Core
         public GeometryBase GetGeometry()
         {
             return GeometryBase;
+        }
+
+        public byte[] Serialize()
+        {
+            using (var ms = new MemoryStream())
+            {
+                var formatter = new BinaryFormatter();
+                formatter.Serialize(ms, GeometryBase);
+
+                return ms.ToArray();
+            }
         }
     }
 }

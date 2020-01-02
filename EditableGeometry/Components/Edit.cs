@@ -103,12 +103,17 @@ namespace EditableGeometry.Components
         public override bool Write(GH_IWriter writer)
         {
             writer.SetBoolean("EditMode", EditMode);
+            var bytes = GH_Convert.CommonObjectToByteArray(Geometry.GetGeometry());
+
+            // When closing rhino this is null :/
+            if(bytes != null) writer.SetByteArray("Geometry", bytes);
             return base.Write(writer);
         }
 
         public override bool Read(GH_IReader reader)
         {
             EditMode = reader.GetBoolean("EditMode");
+            Geometry = new Geometry(GH_Convert.ByteArrayToCommonObject<GeometryBase>(reader.GetByteArray("Geometry")));
             return base.Read(reader);
         }
 
